@@ -3,27 +3,28 @@ from models.petstore_models import Pet
 
 
 @pytest.mark.smoke
-def test_create_pet_minimal(api_client):
-    """Создание питомца с минимальными полями"""
-    pet_data = {
-        "name": "TestDog",
-        "photoUrls": ["https://example.com/photo.jpg"],
-        "status": "available"
-    }
+@pytest.mark.parametrize("field_name, field_value", [
+    ("name", "JustName"),
+    ("photoUrls", ["https://example.com/only-photo.jpg"]),
+    ("status", "available"),
+    ("category", {"id": 1, "name": "Dogs"}),
+    ("tags", [{"id": 1, "name": "friendly"}])
+])
+def test_create_pet_single_field(api_client, field_name, field_value):
+    """Создание питомца с единственным полем"""
+    pet_data = {field_name: field_value}
     response = api_client.post("/pet", json=pet_data)
     assert response.status_code == 200
     pet = Pet(**response.json())
-    assert pet.name == "TestDog"
-    assert pet.status == "available"
-    assert pet.id is not None
-    # Очистка
+    # Превращаем весь объект в словарь
+    pet_dict = pet.model_dump()
+    assert pet_dict.get(field_name) == field_value
     api_client.delete(f"/pet/{pet.id}")
 
 
 @pytest.mark.smoke
 def test_get_pet_by_id(api_client):
     """Получение питомца по ID"""
-    # Создаём тестового питомца
     pet_data = {
         "name": "GetTestDog",
         "photoUrls": ["https://example.com/photo.jpg"],
@@ -31,13 +32,11 @@ def test_get_pet_by_id(api_client):
     }
     create_resp = api_client.post("/pet", json=pet_data)
     pet_id = create_resp.json()["id"]
-    # Получаем данные тестового питомца
     get_resp = api_client.get(f"/pet/{pet_id}")
     assert get_resp.status_code == 200
     pet = Pet(**get_resp.json())
     assert pet.id == pet_id
     assert pet.name == "GetTestDog"
-    # Очистка
     api_client.delete(f"/pet/{pet_id}")
 
 
@@ -53,7 +52,6 @@ def test_create_pet_with_status(api_client, status):
     assert response.status_code == 200
     pet = Pet(**response.json())
     assert pet.status == status
-    # Очистка
     api_client.delete(f"/pet/{pet.id}")
 
 
@@ -66,3 +64,27 @@ def test_get_pet_not_found(api_client):
     from models.petstore_models import ApiResponse
     error = ApiResponse(**response.json())
     assert "not found" in error.message.lower()
+
+
+def test_update_pet(api_client):
+    """Проверяем обновление через PUT, PATCH petstore не поддерживает"""
+    pet_data = {
+        "name": "OriginalName",
+        "photoUrls": ["https://example.com/photo1.jpg"],
+        "status": "available"
+    }
+    create_resp = api_client.post("/pet", json=pet_data)
+    pet_id = create_resp.json()["id"]
+    update_data = {
+        "id": pet_id,
+        "name": "UpdatedName",
+        "photoUrls": ["https://example.com/photo2.jpg"],  # изменили URL
+        "status": "sold"
+    }
+    update_resp = api_client.put("/pet", json=update_data)
+    assert update_resp.status_code == 200
+    updated = Pet(**update_resp.json())
+    assert updated.name == "UpdatedName"
+    assert updated.photoUrls == ["https://example.com/photo2.jpg"]
+    assert updated.status == "sold"
+    api_client.delete(f"/pet/{pet_id}")

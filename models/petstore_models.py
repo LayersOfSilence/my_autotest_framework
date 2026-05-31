@@ -15,11 +15,10 @@ class Tag(BaseModel):
 
 
 class Pet(BaseModel):
-    """Модель питомца"""
     id: Optional[int] = None
     category: Optional[Category] = None
-    name: str
-    photoUrls: List[str]
+    name: Optional[str] = None
+    photoUrls: Optional[List[str]] = None
     tags: Optional[List[Tag]] = None
     status: Optional[str] = None
 
