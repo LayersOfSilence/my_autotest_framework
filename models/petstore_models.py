@@ -3,18 +3,19 @@ from typing import Optional, List
 
 
 class Category(BaseModel):
-    """Категория питомца"""
+    """Модель категории питомца"""
     id: Optional[int] = None
     name: Optional[str] = None
 
 
 class Tag(BaseModel):
-    """Тег питомца"""
+    """Модель тега питомца"""
     id: Optional[int] = None
     name: Optional[str] = None
 
 
 class Pet(BaseModel):
+    """Модель питомца"""
     id: Optional[int] = None
     category: Optional[Category] = None
     name: Optional[str] = None
@@ -46,7 +47,7 @@ class User(BaseModel):
 
 
 class ApiResponse(BaseModel):
-    """Стандартный ответ API"""
+    """Модель ответа API"""
     code: Optional[int] = None
     type: Optional[str] = None
     message: Optional[str] = None

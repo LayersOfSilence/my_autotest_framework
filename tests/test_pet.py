@@ -1,6 +1,8 @@
 import pytest
 from models.petstore_models import Pet
 
+NON_EXISTENT_ID = 999999999
+
 
 @pytest.mark.smoke
 def test_create_pet_full_data(api_client):
@@ -88,8 +90,7 @@ def test_get_pet_by_id(api_client):
 
 def test_get_pet_not_found(api_client):
     """Получение питомца с несуществующим ID → 404"""
-    non_existent_id = 999999999
-    response = api_client.get(f"/pet/{non_existent_id}")
+    response = api_client.get(f"/pet/{NON_EXISTENT_ID}")
     assert response.status_code == 404
     # В ответе ApiResponse модель
     from models.petstore_models import ApiResponse
@@ -126,9 +127,8 @@ def test_update_pet(api_client):
                   "несуществующего питомца, а должен 404")
 def test_update_nonexistent_pet(api_client):
     """Обновление несуществующего питомца"""
-    non_existent_id = 99999999999
     update_data = {
-        "id": non_existent_id,
+        "id": NON_EXISTENT_ID,
         "name": "GhostDog",
         "photoUrls": ["https://example.com/photo.jpg"],
         "status": "available"
@@ -161,8 +161,7 @@ def test_delete_pet(api_client):
                   "несуществующего питомца, а должен 404")
 def test_delete_pet_not_found(api_client):
     """Удаление питомца с несуществующим ID → 404"""
-    non_existent_id = 99999999999
-    response = api_client.delete(f"/pet/{non_existent_id}")
+    response = api_client.delete(f"/pet/{NON_EXISTENT_ID}")
     assert response.status_code == 404
     from models.petstore_models import ApiResponse
     error = ApiResponse(**response.json())
