@@ -1,103 +1,74 @@
 import pytest
 from faker import Faker
+from constants import NON_EXISTENT_USERNAME
 from models.petstore_models import User, ApiResponse
 
 
 fake = Faker()
 
 
-def get_user_data():
-    """Генератор данных пользователя"""
-    username = fake.user_name()
-    return {
-        "username": username,
-        "firstName": fake.first_name(),
-        "lastName": fake.last_name(),
-        "email": f"{username}@example.com",
-        "password": fake.password(length=10),
-        "phone": fake.phone_number(),
-        "userStatus": 1
-    }
-
-
 @pytest.mark.smoke
-def test_create_user(api_client):
+def test_create_user(user_data, create_user):
     """Создание пользователя"""
-    user_data = get_user_data()
-    username = user_data["username"]
-    response = api_client.post("/user", json=user_data)
-    assert response.status_code == 200
+    response = create_user(user_data)
     result = ApiResponse(**response.json())
     assert result.code == 200
-    api_client.delete(f"/user/{username}")
 
 
 @pytest.mark.smoke
-def test_get_user_by_username(api_client):
+def test_get_user_by_username(api_client, user_data, create_user):
     """Получение пользователя по имени"""
-    user_data = get_user_data()
+    create_user(user_data)
     username = user_data["username"]
-    api_client.post("/user", json=user_data)
     response = api_client.get(f"/user/{username}")
     assert response.status_code == 200
     user = User(**response.json())
     assert user.username == username
     assert user.firstName == user_data["firstName"]
-    api_client.delete(f"/user/{username}")
 
 
-def test_get_user_not_found(api_client):
+def test_get_nonexistent_user(api_client):
     """Получение несуществующего пользователя"""
-    response = api_client.get(f"/user/{fake.user_name()}")
+    response = api_client.get(f"/user/{NON_EXISTENT_USERNAME}")
     assert response.status_code == 404
 
 
-@pytest.mark.skip(reason="petstore не возврвщает изменения user после PUT")
-def test_update_user(api_client):
-    """Обновление пользователя"""
-    user_data = get_user_data()
+@pytest.mark.skip(reason="petstore не возвращает изменения user после PUT")
+def test_update_user(api_client, user_data, create_user):
+    """Обновение пользователя"""
     username = user_data["username"]
-    api_client.post("/user", json=user_data)
-    login_resp = api_client.get("/user/login", params={
-        "username": username,
-        "password": user_data["password"]
-    })
+    # Создаём и логинимся
+    create_user(user_data)
+    login_resp = api_client.get("/user/login",
+                                params={"username": username,
+                                        "password": user_data["password"]})
     assert login_resp.status_code == 200
-    login_result = ApiResponse(**login_resp.json())
-    assert "logged in" in login_result.message.lower()
-    new_first_name = fake.first_name()
-    new_last_name = fake.last_name()
-    new_email = fake.email()
-    new_password = fake.password()
-    new_phone = fake.phone_number()
-    update_data = {
+    assert "logged in" in ApiResponse(**login_resp.json()).message.lower()
+    # Обновляем
+    new_data = {
         "username": username,
-        "firstName": new_first_name,
-        "lastName": new_last_name,
-        "email": new_email,
-        "password": new_password,
-        "phone": new_phone,
+        "firstName": fake.first_name(),
+        "lastName": fake.last_name(),
+        "email": fake.email(),
+        "password": fake.password(),
+        "phone": fake.phone_number(),
         "userStatus": 0
     }
-    response = api_client.put(f"/user/{username}", json=update_data)
-    assert response.status_code == 200
-    get_resp = api_client.get(f"/user/{username}")
-    user = User(**get_resp.json())
-    assert user.firstName == new_first_name
-    assert user.lastName == new_last_name
-    assert user.email == new_email
-    assert user.password == new_password
-    assert user.phone == new_phone
-    assert user.userStatus == 0
+    assert api_client.put(f"/user/{username}",
+                          json=new_data).status_code == 200
+    # Проверяем все поля
+    user = User(**api_client.get(f"/user/{username}").json())
+    for field in ["firstName", "lastName", "email", "password",
+                  "phone", "userStatus"]:
+        assert getattr(user, field) == new_data[field]
     api_client.delete(f"/user/{username}")
 
 
 @pytest.mark.smoke
-def test_delete_user(api_client):
+def test_delete_user(api_client, user_data, create_user):
     """Удаление пользователя"""
-    user_data = get_user_data()
     username = user_data["username"]
-    api_client.post("/user", json=user_data)
+    create_user(user_data)
     delete_resp = api_client.delete(f"/user/{username}")
     assert delete_resp.status_code == 200
     get_resp = api_client.get(f"/user/{username}")
@@ -105,12 +76,11 @@ def test_delete_user(api_client):
 
 
 @pytest.mark.smoke
-def test_user_login_logout(api_client):
+def test_user_login_logout(api_client, user_data, create_user):
     """Логин и логаут пользователя"""
-    user_data = get_user_data()
     username = user_data["username"]
     password = user_data["password"]
-    api_client.post("/user", json=user_data)
+    create_user(user_data)
     login_resp = api_client.get("/user/login", params={
         "username": username,
         "password": password
@@ -120,13 +90,15 @@ def test_user_login_logout(api_client):
     assert "logged in" in result.message.lower()
     logout_resp = api_client.get("/user/logout")
     assert logout_resp.status_code == 200
-    api_client.delete(f"/user/{username}")
 
 
-def test_create_users_with_list(api_client):
+def test_create_users_with_list(api_client, user_data, cleanup_users):
     """Создание нескольких пользователей списком"""
-    users = [get_user_data() for _ in range(2)]
+    second_user = user_data.copy()
+    second_user["username"] = fake.user_name()
+    second_user["email"] = f"{second_user['username']}@example.com"
+    users = [user_data, second_user]
     response = api_client.post("/user/createWithList", json=users)
+    if response.status_code == 200:
+        cleanup_users.extend([user["username"] for user in users])
     assert response.status_code == 200
-    for user in users:
-        api_client.delete(f"/user/{user['username']}")
